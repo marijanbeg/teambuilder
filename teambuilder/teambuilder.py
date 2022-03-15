@@ -4,8 +4,6 @@ import collections.abc
 import pandas as pd
 import numpy as np
 
-random.seed(10)
-
 
 class TeamBuilder:
     def __init__(self, data, id, categorical=[], continuous=[],
@@ -143,7 +141,6 @@ class TeamBuilder:
             original.data.iloc[b]['group'], original.data.iloc[a]['group'])
 
         self.data = original.data if original.cost() < c_init else self.data
-
 
     def solve(self, groups, n, cost=None):
         """Build teams.
