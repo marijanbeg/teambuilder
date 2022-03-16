@@ -38,8 +38,8 @@ class TestTeamBuilder:
         self.id = 'name'
         self.categorical = ['categorical1', 'categorical2']
         self.continuous = ['continuous1', 'countinuous2']
-        self.together = []
-        self.separate = []
+        self.together = [[f'person-{i}' for i in [0, 1, 2, 3, 4]]]
+        self.separate = [[f'person-{i}' for i in [5, 6, 7, 8, 9]]]
         self.data = synthetic(self.n,
                               categorical=self.categorical,
                               continuous=self.continuous)
@@ -61,7 +61,7 @@ class TestTeamBuilder:
                          together=self.together,
                          separate=self.separate)
         tb.shuffle()
-        
+
         assert list(self.data[self.id]) != list(tb.data[self.id])
         assert all(any(tb.data[self.id].isin([i])) for i in self.data[self.id])
 
@@ -72,18 +72,18 @@ class TestTeamBuilder:
                          continuous=self.continuous,
                          together=self.together,
                          separate=self.separate)
-        
+
         groups = 4 * [20] + [10, 5, 5]
         assert sum(groups) == len(self.data)
-        
+
         tb._initial_state(groups=groups)
-        
+
         assert 'group' in tb.data.columns
         for i, n in enumerate(groups):
             assert len(tb.data[tb.data['group'] == i]) == n
-            
+
         assert len(tb.data[tb.data['group'] == 4]) == 10
-        
+
     def test_stats(self):
         tb = TeamBuilder(data=self.data,
                          id=self.id,
@@ -91,14 +91,15 @@ class TestTeamBuilder:
                          continuous=self.continuous,
                          together=self.together,
                          separate=self.separate)
-        
+
         groups = 10 * [10]
         tb._initial_state(groups=groups)
         stats = tb.stats()
-        
-        assert all(i in stats.columns for i in self.categorical + self.continuous)
+
+        assert all(i in stats.columns for i in self.categorical +
+                   self.continuous)
         assert len(stats) == len(groups) + 1  # +1 is added for totals
-        
+
     def test_cost(self):
         tb = TeamBuilder(data=self.data,
                          id=self.id,
@@ -106,13 +107,13 @@ class TestTeamBuilder:
                          continuous=self.continuous,
                          together=self.together,
                          separate=self.separate)
-        
+
         groups = 10 * [10]
         tb._initial_state(groups=groups)
-        
+
         assert isinstance(tb.cost(), float)
         assert tb.cost() > 0
-        
+
     def test_step(self):
         tb = TeamBuilder(data=self.data,
                          id=self.id,
@@ -120,26 +121,45 @@ class TestTeamBuilder:
                          continuous=self.continuous,
                          together=self.together,
                          separate=self.separate)
-        
+
         groups = 5 * [20]
         tb._initial_state(groups=groups)
-        
+
         tb.step()
+
+    def test_solve1(self):
+        tb = TeamBuilder(data=self.data,
+                         id=self.id,
+                         categorical=self.categorical,
+                         continuous=self.continuous,
+                         together=[],
+                         separate=[])
+
+        groups = 10 * [10]
+        tb._initial_state(groups=groups)
+        cost_init = tb.cost()
+
+        tb.solve(groups=groups, n=200)
+
+        cost_final = tb.cost()
+
+        assert cost_final < cost_init
         
-    def test_solve(self):
+    def test_solve2(self):
         tb = TeamBuilder(data=self.data,
                          id=self.id,
                          categorical=self.categorical,
                          continuous=self.continuous,
                          together=self.together,
                          separate=self.separate)
-        
+
         groups = 10 * [10]
         tb._initial_state(groups=groups)
+        tb.shuffle()
         cost_init = tb.cost()
-        
-        tb.solve(groups=groups, n=1000)
-        
+
+        tb.solve(groups=groups, n=100)
+
         cost_final = tb.cost()
-        
+
         assert cost_final < cost_init

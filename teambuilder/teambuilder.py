@@ -1,12 +1,14 @@
 import random
 import functools
+import itertools
 import collections.abc
 import pandas as pd
 import numpy as np
 
 
 class TeamBuilder:
-    def __init__(self, data, id, categorical=[], continuous=[],
+    def __init__(self, data, id,
+                 categorical=[], continuous=[],
                  together=[], separate=[]):
         self.data = data
         self.id = id
@@ -79,6 +81,13 @@ class TeamBuilder:
             Cost
 
         """
+        # together and separate cost
+        cost_ts = sum(len(set(separate).intersection(set(self.data[self.data['group'] == group][self.id])))**2
+                      for separate, group in itertools.product(self.separate, self.data['group'].unique()))
+        cost_ts += sum(-len(set(together).intersection(set(self.data[self.data['group'] == group][self.id])))**2
+                       for together, group in itertools.product(self.together, self.data['group'].unique()))
+
+        # categorical and continuous variable costs.
         totals = dict(**{i: self.data[self.data[i] == 1].count()[i] / len(self.data) for i in self.categorical},
                       **{i: self.data[i].mean() for i in self.continuous})
 
@@ -88,8 +97,11 @@ class TeamBuilder:
 
         per_group = {k: v.fillna(0) for k, v in per_group.items()}
 
-        return sum([abs(per_group[i] - totals[i]).sum() for i in self.categorical] +
-                   [0.01*abs(per_group[i] - totals[i]).sum() for i in self.continuous])
+        cost_cc = sum([abs(per_group[i] - totals[i]).sum() for i in self.categorical] +
+                      [0.01*abs(per_group[i] - totals[i]).sum() for i in self.continuous])
+
+        # Total cost
+        return cost_cc + cost_ts
 
     @property
     def _partial(self):
@@ -116,7 +128,7 @@ class TeamBuilder:
         # If there is only one group, minimisation does not make sense.
         if self.data.groupby('group').count().shape[0] <= 1:
             raise ValueError('There must be at least two groups in data.')
-        
+
         cost = cost or self.cost
 
         n = len(self.data)  # total number of students
@@ -144,19 +156,19 @@ class TeamBuilder:
 
     def solve(self, groups, n, cost=None):
         """Build teams.
-    
+
         Parameters
         ----------
         groups: Iterable(int)
             The number of people per group.
-            
+
         n: int
             Total number of steps.
-        
+
         cost: callable, optional
             Cost function. If ``None``, ``self.cost`` is used. Defaults to
             ``None``.
-        
+
         """
         if 'group' not in self.data.columns:
             self._initial_state(groups=groups)
