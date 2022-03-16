@@ -63,9 +63,11 @@ class TeamBuilder:
             raise ValueError(
                 'Data must be reduced before the statistics can be shown.')
 
-        per_group = dict(**{i: self.data[self.data[i] == 1].groupby('group').count()[i] for i in self.categorical},
-                         **{i: self.data.groupby('group')[i].mean() for i in self.continuous},
-                         n=self.data.groupby('group').count()[self.categorical[0]])
+        group_var = 'group_name' if hasattr(self, 'names') else 'group'
+        
+        per_group = dict(**{i: self.data[self.data[i] == 1].groupby(group_var).count()[i] for i in self.categorical},
+                         **{i: self.data.groupby(group_var)[i].mean() for i in self.continuous},
+                         n=self.data.groupby(group_var).count()[self.categorical[0]])
 
         totals = dict(**{i: self.data[self.data[i] == 1].count()[i] for i in self.categorical},
                       **{i: self.data[i].mean() for i in self.continuous},
@@ -73,16 +75,24 @@ class TeamBuilder:
 
         # Explore how many separate rules are broken.
         split_stats = collections.defaultdict(list)
-        for group in self.data['group'].unique():
-            split_stats['group'].append(group)
-            split_stats['n_together'].append(max(len(set(separate).intersection(set(self.data[self.data['group'] == group][self.id])))
+        for group in self.data[group_var].unique():
+            split_stats[group_var].append(group)
+            split_stats['n_together'].append(max(len(set(separate).intersection(set(self.data[self.data[group_var] == group][self.id])))
                                                  for separate in self.separate))
 
-        res = pd.concat([pd.DataFrame(per_group).join(pd.DataFrame(split_stats).set_index('group')), pd.DataFrame(totals, index=['total'])]).fillna(0)
+        res = pd.concat([pd.DataFrame(per_group).join(pd.DataFrame(split_stats).set_index(group_var)), pd.DataFrame(totals, index=['total'])]).fillna(0)
         res.loc['total', 'n_together'] = res['n_together'].max()
         
         return res
 
+    def name_groups(self, names):
+        if len(self.data['group'].unique()) != len(names):
+            raise ValueError(f'The number of elements must be {len(self.data["group"].unique())}.')
+        
+        self.names = names
+        for group, name in enumerate(names):
+            self.data.loc[self.data['group'] == group, 'group_name'] = name
+        
     def cost(self):
         """Cost function.
 
