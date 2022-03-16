@@ -141,9 +141,7 @@ class TestTeamBuilder:
 
         tb.solve(groups=groups, n=200)
 
-        cost_final = tb.cost()
-
-        assert cost_final < cost_init
+        assert tb.cost() < cost_init
         
     def test_solve2(self):
         tb = TeamBuilder(data=self.data,
@@ -160,6 +158,13 @@ class TestTeamBuilder:
 
         tb.solve(groups=groups, n=100)
 
-        cost_final = tb.cost()
-
-        assert cost_final < cost_init
+        # Does cost decrease?
+        assert tb.cost() < cost_init
+        
+        # Are people together as expected?
+        group = tb.data[tb.data[self.id] == self.together[0][0]]['group'].values[0]
+        assert all(i in tb.data[tb.data['group'] == group][self.id].to_list() for i in self.together[0])
+        
+        # Are people separate as expected?
+        assert max(len(set(tb.data[tb.data['group'] == group][self.id]).intersection(self.separate[0]))
+                   for group in self.data['group'].unique()) == 1
