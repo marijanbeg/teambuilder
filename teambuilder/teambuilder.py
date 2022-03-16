@@ -1,6 +1,7 @@
 import random
 import functools
 import itertools
+import collections
 import collections.abc
 import pandas as pd
 import numpy as np
@@ -70,7 +71,17 @@ class TeamBuilder:
                       **{i: self.data[i].mean() for i in self.continuous},
                       n=len(self.data))
 
-        return pd.concat([pd.DataFrame(per_group), pd.DataFrame(totals, index=['total'])]).fillna(0)
+        # Explore how many separate rules are broken.
+        split_stats = collections.defaultdict(list)
+        for group in self.data['group'].unique():
+            split_stats['group'].append(group)
+            split_stats['n_together'].append(max(len(set(separate).intersection(set(self.data[self.data['group'] == group][self.id])))
+                                                 for separate in self.separate))
+
+        res = pd.concat([pd.DataFrame(per_group).join(pd.DataFrame(split_stats).set_index('group')), pd.DataFrame(totals, index=['total'])]).fillna(0)
+        res.loc['total', 'n_together'] = res['n_together'].max()
+        
+        return res
 
     def cost(self):
         """Cost function.
