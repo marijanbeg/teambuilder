@@ -1,100 +1,167 @@
 import random
 import functools
-import itertools
 import collections
 import collections.abc
 import pandas as pd
-import numpy as np
 
 
 class TeamBuilder:
-    def __init__(self, data, id,
+    """TeamBuilder class for building diverse teams.
+    
+    Parameters
+    ----------
+    data: pandas.DataFrame
+        DataFrame with details about individuals.
+    identifier: str
+        Column name in ``data`` used to specify individuals.
+    groups: Iterable(int)
+        The number of people per group.
+    categorical: Iterable(str)
+        Column names of variables that should be trated as categorical.
+    continuous: Iterable(str)
+        Column names of variables that should be trated as continuous.
+    together: Iterable(Iterable(str))
+        Groups of individuals that should be kept together.
+    separate: Iterable(Iterable(str))
+        Groups of individuals that should be kept separate.
+    
+    """
+    def __init__(self, data, identifier, groups=[], group_names=None,
                  categorical=[], continuous=[],
                  together=[], separate=[]):
+        # Input checks
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError(f'Unsupported {type(data)=}.')
+        
+        if identifier not in data.columns:
+            raise ValueError(f'{identifier=} is not a column name in data.')
+        
+        if not isinstance(groups, collections.abc.Iterable):
+            raise TypeError(f'Unsupported {type(groups)=}.')
+        if sum(groups) != len(data):
+            raise ValueError(f'{sum(groups)=} is not equal to {len(data)=}.')
+        
+        if len(group_names) != len(groups):
+            raise ValueError(f'{len(group_names)=} is not equal to {len(groups)=}.')
+        
+        if not isinstance(categorical, collections.abc.Iterable):
+            raise TypeError(f'Unsupported {type(categorical)=}.')
+        if not all(i in data.columns for i in categorical):
+            raise ValueError(f'All elements in categorical must be column names in data.')
+        
+        if not isinstance(continuous, collections.abc.Iterable):
+            raise TypeError(f'Unsupported {type(continuous)=}.')
+        if not all(i in data.columns for i in continuous):
+            raise ValueError(f'All elements in continuous must be column names in data.')
+        
+        if not isinstance(together, collections.abc.Iterable):
+            raise TypeError(f'Unsupported {type(together)=}.')
+        if not all(data[identifier].to_list() for i in sum(together, start=[])):
+            raise ValueError(f'All elements in flattened together must be in data[identifier].')
+        
+        if not isinstance(separate, collections.abc.Iterable):
+            raise TypeError(f'Unsupported {type(separate)=}.')
+        if not all(i in data[identifier].to_list() for i in sum(separate, start=[])):
+            raise ValueError(f'All elements in flattened separate must be in data[identifier].')
+        
         self.data = data
-        self.id = id
+        self.identifier = identifier
+        self.groups = groups
+        self.group_names = group_names
         self.categorical = categorical
-        self.continuous = continuous
+        self.continuous = continuous 
         self.together = together
         self.separate = separate
+        
+        # Do the initial split.
+        self.data['group_number'] = random.sample(sum((n * [i] for i, n in enumerate(groups)), start=[]),
+                                                  sum(groups))
+        
+        # Name the groups.
+        if group_names is not None:
+            for i, name in enumerate(group_names):
+                self.data.loc[self.data['group_number'] == i, 'group_name'] = name
 
-    def shuffle(self, random_state=None):
-        """Shuffle ``self.data``"""
-        self.data = self.data.sample(
-            frac=1, random_state=random_state, ignore_index=True)
-
-    def _initial_state(self, groups):
-        """Initial split of data into groups.
-
-        By passing an iterable via ``groups``, the exact number of people per
-        group is specified. The sum of values in ``groups`` iterable must be the
-        same as the number of rows in ``self.data``. Column ``group`` is added
-        to ``self.data``.
-
-        Parameters
-        ----------
-        groups: Iterable(int)
-            The number of people per group.
+    @property
+    def n_groups(self):
+        """Number of groups.
+        
+        Returns
+        -------
+        int
+            The number of groups.
 
         """
-        if not isinstance(groups, collections.abc.Iterable):
-            raise TypeError(f'Unsupported for {type(groups)=}.')
-        if sum(groups) != len(self.data):
-            raise ValueError(
-                f'The sum of chunks must be the same as {len(self.data)=}.')
-
-        for i, (chunk, start) in enumerate(zip(groups, np.cumsum([0, *groups]))):
-            self.data.loc[start: start+chunk, 'group'] = i
-
-    def stats(self):
-        """Statistics overview.
-
-        Computes the statistics "per group". For categorical variables, it
-        computes the number of people with that characteristic. For continuous
-        variables, it computes the mean.
+        return len(self.groups)
+    
+    def __getitem__(self, group):
+        """DataFrame consisting of all group members.
+        
+        Parameters
+        ----------
+        group: int, str
+            Group number or name.
 
         Returns
         -------
         pd.DataFrame
-            Statistics overview.
+            Group
+        
+        """
+        group = self.group_names.index(group) if isinstance(group, str) else group
+
+        return self.data[self.data['group_number'] == group]
+
+    def members(self, group, /):
+        """Identifiers of groups members.
+        
+        Parameters
+        ----------
+        group: int, str
+            Group number or name.
+
+        Returns
+        -------
+        list
+            Members
 
         """
-        if 'group' not in self.data.columns:
-            raise ValueError(
-                'Data must be reduced before the statistics can be shown.')
+        return self[group][self.identifier].to_list()
 
-        group_var = 'group_name' if hasattr(self, 'names') else 'group'
-        
-        per_group = dict(**{i: self.data[self.data[i] == 1].groupby(group_var).count()[i] for i in self.categorical},
-                         **{i: self.data.groupby(group_var)[i].mean() for i in self.continuous},
-                         n=self.data.groupby(group_var).count()[self.categorical[0]])
+    @functools.cached_property
+    def diversity(self):
+          return dict(**{i: self.data[i].sum() / len(self.data) for i in self.categorical},
+                      **{i: self.data[i].mean() for i in self.continuous})
 
-        totals = dict(**{i: self.data[self.data[i] == 1].count()[i] for i in self.categorical},
-                      **{i: self.data[i].mean() for i in self.continuous},
-                      n=len(self.data))
+    def group_cost(self, group, /):
+        """Cost value of a single group.
 
-        # Explore how many separate rules are broken.
-        split_stats = collections.defaultdict(list)
-        for group in self.data[group_var].unique():
-            split_stats[group_var].append(group)
-            split_stats['n_together'].append(max(len(set(separate).intersection(set(self.data[self.data[group_var] == group][self.id])))
-                                                 for separate in self.separate))
+        Parameters
+        ----------
+        group: int, str
+            Group number or name.
 
-        res = pd.concat([pd.DataFrame(per_group).join(pd.DataFrame(split_stats).set_index(group_var)), pd.DataFrame(totals, index=['total'])]).fillna(0)
-        res.loc['total', 'n_together'] = res['n_together'].max()
-        
-        return res
+        Returns
+        -------
+        float
+            Cost
 
-    def name_groups(self, names):
-        if len(self.data['group'].unique()) != len(names):
-            raise ValueError(f'The number of elements must be {len(self.data["group"].unique())}.')
-        
-        self.names = names
-        for group, name in enumerate(names):
-            self.data.loc[self.data['group'] == group, 'group_name'] = name
-        
+        """            
+        c = sum(len(set(i) & set(self.members(group)))**2 for i in self.separate)
+        c += sum(-len(set(i) & set(self.members(group)))**2 for i in self.together)
+
+        grp = dict(**{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
+                   **{i: self[group][i].mean() for i in self.continuous})
+        # grp = {k: 0 if np.isnan(v) else v for k, v in grp.items()}
+
+        c += sum([abs(grp[i] - self.diversity[i]) for i in self.categorical])
+        c += sum([1 / self.data[i].max() * abs(grp[i] - self.diversity[i]) for i in self.continuous])
+
+        return c
+
+    @property  
     def cost(self):
-        """Cost function.
+        """Total cost.
 
         Returns
         -------
@@ -102,100 +169,83 @@ class TeamBuilder:
             Cost
 
         """
-        # together and separate cost
-        cost_ts = sum(len(set(separate).intersection(set(self.data[self.data['group'] == group][self.id])))**2
-                      for separate, group in itertools.product(self.separate, self.data['group'].unique()))
-        cost_ts += sum(-len(set(together).intersection(set(self.data[self.data['group'] == group][self.id])))**2
-                       for together, group in itertools.product(self.together, self.data['group'].unique()))
+        return sum(self.group_cost(i) for i in range(self.n_groups))
 
-        # categorical and continuous variable costs.
-        totals = dict(**{i: self.data[self.data[i] == 1].count()[i] / len(self.data) for i in self.categorical},
-                      **{i: self.data[i].mean() for i in self.continuous})
-
-        per_group = dict(**{i: (self.data[self.data[i] == 1].groupby('group').count()[i] /
-                                self.data.groupby('group').count()[i]) for i in self.categorical},
-                         **{i: self.data.groupby('group')[i].mean() for i in self.continuous})
-
-        per_group = {k: v.fillna(0) for k, v in per_group.items()}
-
-        cost_cc = sum([abs(per_group[i] - totals[i]).sum() for i in self.categorical] +
-                      [0.01*abs(per_group[i] - totals[i]).sum() for i in self.continuous])
-
-        # Total cost
-        return cost_cc + cost_ts
-
-    @property
-    def _partial(self):
-        return functools.partial(self.__class__,
-                                 id=self.id,
-                                 categorical=self.categorical,
-                                 continuous=self.continuous,
-                                 together=self.together,
-                                 separate=self.separate)
-
-    def step(self, cost=None):
+    def step(self):
         """Relaxation step.
 
-        Swaps two random people between two different groups. If the cost
+        Swap two random people between two different groups. If the cost
         function decreases, the step is accepted.
 
-        Parameters
-        ----------
-        cost: callable, optional
-            Cost function. If ``None``, ``self.cost`` is used. Defaults to
-            ``None``.
-
         """
-        # If there is only one group, minimisation does not make sense.
-        if self.data.groupby('group').count().shape[0] <= 1:
-            raise ValueError('There must be at least two groups in data.')
+        n = len(self.data)  # total number of people
 
-        cost = cost or self.cost
-
-        n = len(self.data)  # total number of students
-        original = self._partial(self.data.copy())  # deep copy
-
-        c_init = original.cost()  # original cost
-
-        if 'fixed' not in original.data.columns:
-            original.data['fixed'] = 0
-
-        # Select two students from different groups and ensure they are not fixed.
+        # Select two people from different groups.
         while True:
             a = random.randint(0, n-1)
             b = random.randint(0, n-1)
 
-            if (original.data.iloc[a]['group'] != original.data.iloc[b]['group'] and
-                    not original.data.iloc[a]['fixed'] and not original.data.iloc[b]['fixed']):
+            # groups to which a and b belong to
+            ga = self.data.iloc[a]['group_number']
+            gb = self.data.iloc[b]['group_number']
+            
+            if ga != gb:
                 break
+            
+        # cost before the swap
+        c_init = self.group_cost(ga) + self.group_cost(gb)
 
-        # Swap two random students from different groups.
-        (original.data.at[a, 'group'], original.data.at[b, 'group']) = (
-            original.data.iloc[b]['group'], original.data.iloc[a]['group'])
+        # Swap.
+        self.data.at[a, 'group_number'], self.data.at[b, 'group_number'] = gb, ga
+        self.data.at[a, 'group_name'], self.data.at[b, 'group_name'] = self.group_names[gb], self.group_names[ga]
+        
+        # Go back to original groups if cost does not go down.
+        if self.group_cost(ga) + self.group_cost(gb) > c_init:
+            self.data.at[a, 'group_number'], self.data.at[b, 'group_number'] = ga, gb
+            self.data.at[a, 'group_name'], self.data.at[b, 'group_name'] = self.group_names[ga], self.group_names[gb]
 
-        self.data = original.data if original.cost() < c_init else self.data
-
-    def solve(self, groups, n, cost=None):
+    def solve(self, n_iter, n_print=500):
         """Build teams.
 
         Parameters
         ----------
-        groups: Iterable(int)
-            The number of people per group.
-
-        n: int
+        n_iter: int
             Total number of steps.
-
-        cost: callable, optional
-            Cost function. If ``None``, ``self.cost`` is used. Defaults to
-            ``None``.
+        n_print: int
+            The cost is printed every n_print number of steps.
 
         """
-        if 'group' not in self.data.columns:
-            self._initial_state(groups=groups)
+        for i in range(n_iter):
+            self.step()
 
-        for i in range(n):
-            self.step(cost=cost)
+            if i % n_print == 0:
+                print(f'step = {i: 6d}: cost = {self.cost: .3f}')
 
-            if i % 500 == 0:
-                print(f'step = {i: 6d}: cost = {self.cost(): .3f}')
+    def overview(self):
+        """Groups overview.
+
+        Returns
+        -------
+        pd.DataFrame
+            Groups overview.
+
+        """
+        per_group = dict(**{i: self.data.groupby('group_name')[i].sum() for i in self.categorical},
+                         **{i: self.data.groupby('group_name')[i].mean() for i in self.continuous},
+                         n=self.data.groupby('group_name').count()[self.categorical[0]])
+
+        totals = dict(**{i: self.data[i].count() for i in self.categorical},
+                      **{i: self.data[i].mean() for i in self.continuous},
+                      n=len(self.data))
+
+        # Explore how many separate rules are broken.
+        split_stats = collections.defaultdict(list)
+        for group in self.data['group_name'].unique():
+            split_stats['group_name'].append(group)
+            split_stats['n_together'].append(max(len(set(separate).intersection(set(self.members(group))))
+                                                 for separate in self.separate))
+
+        res = pd.concat([pd.DataFrame(per_group).join(pd.DataFrame(split_stats).set_index('group_name')), pd.DataFrame(totals, index=['total'])]).fillna(0)
+        res.loc['total', 'n_together'] = res['n_together'].max()
+        
+        return res
