@@ -227,7 +227,7 @@ class TeamBuilder:
         for i in range(n_iter):
             self.step()
 
-            if i % n_print == 0:
+            if i % n_print == 0 or i == n_iter - 1:
                 print(f'step = {i: 6d}: cost = {self.cost: .3f}')
 
     def overview(self):
