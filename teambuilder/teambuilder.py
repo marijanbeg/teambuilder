@@ -28,7 +28,8 @@ class TeamBuilder:
     """
     def __init__(self, data, identifier, groups=[], group_names=None,
                  categorical=[], continuous=[],
-                 together=[], separate=[]):
+                 together=[], separate=[],
+                 enforce_group={}):
         # Input checks
         if not isinstance(data, pd.DataFrame):
             raise TypeError(f'Unsupported {type(data)=}.')
@@ -64,6 +65,9 @@ class TeamBuilder:
         if not all(i in data[identifier].to_list() for i in sum(separate, start=[])):
             raise ValueError(f'All elements in flattened separate must be in data[identifier].')
         
+        if not all(k in data[identifier].to_list() for k in enforce_group):
+            raise ValueError(f'Keys must be valid identifiers.')
+        
         self.data = data
         self.identifier = identifier
         self.groups = groups
@@ -72,7 +76,8 @@ class TeamBuilder:
         self.continuous = continuous 
         self.together = together
         self.separate = separate
-        
+        self.enforce_group = enforce_group
+
         # Do the initial split.
         self.data['group_number'] = random.sample(sum((n * [i] for i, n in enumerate(groups)), start=[]),
                                                   sum(groups))
@@ -149,10 +154,14 @@ class TeamBuilder:
         """            
         c = sum(len(set(i) & set(self.members(group)))**2 for i in self.separate)
         c += sum(-len(set(i) & set(self.members(group)))**2 for i in self.together)
+        
+        for k, v in self.enforce_group.items():
+            if k in self[group][self.identifier].to_list():
+                if v != len(self[group]):
+                    c += 1e6 * len(self[group])
 
         grp = dict(**{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
                    **{i: self[group][i].mean() for i in self.continuous})
-        # grp = {k: 0 if np.isnan(v) else v for k, v in grp.items()}
 
         c += sum([abs(grp[i] - self.diversity[i]) for i in self.categorical])
         c += sum([1 / self.data[i].max() * abs(grp[i] - self.diversity[i]) for i in self.continuous])
