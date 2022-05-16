@@ -170,7 +170,7 @@ class TeamBuilder:
 
     @property  
     def cost(self):
-        """Total cost.
+        """Total cost across all groups.
 
         Returns
         -------
