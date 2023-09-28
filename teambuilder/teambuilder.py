@@ -24,6 +24,8 @@ class TeamBuilder:
         Groups of individuals that should be kept together.
     separate: Iterable(Iterable(str))
         Groups of individuals that should be kept separate.
+    minimum_values: dict
+        Dictionary of required minimum members with the same categorical value in each group.
 
     """
 
@@ -38,6 +40,7 @@ class TeamBuilder:
         together=[],
         separate=[],
         enforce_group={},
+        minimum_values={},
     ):
         # Input checks
         if not isinstance(data, pd.DataFrame):
@@ -94,6 +97,7 @@ class TeamBuilder:
         self.together = together
         self.separate = separate
         self.enforce_group = enforce_group
+        self.minimum_values = minimum_values
 
         # Do the initial split.
         self.data["group_number"] = random.sample(
@@ -178,7 +182,7 @@ class TeamBuilder:
         for k, v in self.enforce_group.items():
             if k in self[group][self.identifier].to_list():
                 if v != len(self[group]):
-                    c += 1e6 * len(self[group])
+                    c += 1e4 * len(self[group])
 
         grp = dict(
             **{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
@@ -191,6 +195,10 @@ class TeamBuilder:
                 1 / self.data[i].max() * abs(grp[i] - self.diversity[i])
                 for i in self.continuous
             ]
+        )
+
+        c += sum(
+            (0 < self[group][i].sum() < j) * 1e3 for i, j in self.minimum_values.items()
         )
 
         return c
