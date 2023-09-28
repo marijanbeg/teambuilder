@@ -41,6 +41,7 @@ class TeamBuilder:
         separate=[],
         enforce_group={},
         minimum_values={},
+        maximum_values={},
     ):
         # Input checks
         if not isinstance(data, pd.DataFrame):
@@ -98,6 +99,7 @@ class TeamBuilder:
         self.separate = separate
         self.enforce_group = enforce_group
         self.minimum_values = minimum_values
+        self.maximum_values = maximum_values
 
         # Do the initial split.
         self.data["group_number"] = random.sample(
@@ -199,6 +201,9 @@ class TeamBuilder:
 
         c += sum(
             (0 < self[group][i].sum() < j) * 1e3 for i, j in self.minimum_values.items()
+        )
+        c += sum(
+            (self[group][i].sum() > j) * 1e3 for i, j in self.maximum_values.items()
         )
 
         return c
