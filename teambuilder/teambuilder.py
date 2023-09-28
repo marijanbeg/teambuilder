@@ -7,7 +7,7 @@ import pandas as pd
 
 class TeamBuilder:
     """TeamBuilder class for building diverse teams.
-    
+
     Parameters
     ----------
     data: pandas.DataFrame
@@ -24,73 +24,91 @@ class TeamBuilder:
         Groups of individuals that should be kept together.
     separate: Iterable(Iterable(str))
         Groups of individuals that should be kept separate.
-    
+
     """
-    def __init__(self, data, identifier, groups=[], group_names=None,
-                 categorical=[], continuous=[],
-                 together=[], separate=[],
-                 enforce_group={}):
+
+    def __init__(
+        self,
+        data,
+        identifier,
+        groups=[],
+        group_names=None,
+        categorical=[],
+        continuous=[],
+        together=[],
+        separate=[],
+        enforce_group={},
+    ):
         # Input checks
         if not isinstance(data, pd.DataFrame):
-            raise TypeError(f'Unsupported {type(data)=}.')
-        
+            raise TypeError(f"Unsupported {type(data)=}.")
+
         if identifier not in data.columns:
-            raise ValueError(f'{identifier=} is not a column name in data.')
-        
+            raise ValueError(f"{identifier=} is not a column name in data.")
+
         if not isinstance(groups, collections.abc.Iterable):
-            raise TypeError(f'Unsupported {type(groups)=}.')
+            raise TypeError(f"Unsupported {type(groups)=}.")
         if sum(groups) != len(data):
-            raise ValueError(f'{sum(groups)=} is not equal to {len(data)=}.')
-        
+            raise ValueError(f"{sum(groups)=} is not equal to {len(data)=}.")
+
         if len(group_names) != len(groups):
-            raise ValueError(f'{len(group_names)=} is not equal to {len(groups)=}.')
-        
+            raise ValueError(f"{len(group_names)=} is not equal to {len(groups)=}.")
+
         if not isinstance(categorical, collections.abc.Iterable):
-            raise TypeError(f'Unsupported {type(categorical)=}.')
+            raise TypeError(f"Unsupported {type(categorical)=}.")
         if not all(i in data.columns for i in categorical):
-            raise ValueError(f'All elements in categorical must be column names in data.')
-        
+            raise ValueError(
+                f"All elements in categorical must be column names in data."
+            )
+
         if not isinstance(continuous, collections.abc.Iterable):
-            raise TypeError(f'Unsupported {type(continuous)=}.')
+            raise TypeError(f"Unsupported {type(continuous)=}.")
         if not all(i in data.columns for i in continuous):
-            raise ValueError(f'All elements in continuous must be column names in data.')
-        
+            raise ValueError(
+                f"All elements in continuous must be column names in data."
+            )
+
         if not isinstance(together, collections.abc.Iterable):
-            raise TypeError(f'Unsupported {type(together)=}.')
+            raise TypeError(f"Unsupported {type(together)=}.")
         if not all(data[identifier].to_list() for i in sum(together, start=[])):
-            raise ValueError(f'All elements in flattened together must be in data[identifier].')
-        
+            raise ValueError(
+                f"All elements in flattened together must be in data[identifier]."
+            )
+
         if not isinstance(separate, collections.abc.Iterable):
-            raise TypeError(f'Unsupported {type(separate)=}.')
+            raise TypeError(f"Unsupported {type(separate)=}.")
         if not all(i in data[identifier].to_list() for i in sum(separate, start=[])):
-            raise ValueError(f'All elements in flattened separate must be in data[identifier].')
-        
+            raise ValueError(
+                f"All elements in flattened separate must be in data[identifier]."
+            )
+
         if not all(k in data[identifier].to_list() for k in enforce_group):
-            raise ValueError(f'Keys must be valid identifiers.')
-        
+            raise ValueError(f"Keys must be valid identifiers.")
+
         self.data = data
         self.identifier = identifier
         self.groups = groups
         self.group_names = group_names
         self.categorical = categorical
-        self.continuous = continuous 
+        self.continuous = continuous
         self.together = together
         self.separate = separate
         self.enforce_group = enforce_group
 
         # Do the initial split.
-        self.data['group_number'] = random.sample(sum((n * [i] for i, n in enumerate(groups)), start=[]),
-                                                  sum(groups))
-        
+        self.data["group_number"] = random.sample(
+            sum((n * [i] for i, n in enumerate(groups)), start=[]), sum(groups)
+        )
+
         # Name the groups.
         if group_names is not None:
             for i, name in enumerate(group_names):
-                self.data.loc[self.data['group_number'] == i, 'group_name'] = name
+                self.data.loc[self.data["group_number"] == i, "group_name"] = name
 
     @property
     def n_groups(self):
         """Number of groups.
-        
+
         Returns
         -------
         int
@@ -98,10 +116,10 @@ class TeamBuilder:
 
         """
         return len(self.groups)
-    
+
     def __getitem__(self, group):
         """DataFrame consisting of all group members.
-        
+
         Parameters
         ----------
         group: int, str
@@ -111,15 +129,15 @@ class TeamBuilder:
         -------
         pd.DataFrame
             Group
-        
+
         """
         group = self.group_names.index(group) if isinstance(group, str) else group
 
-        return self.data[self.data['group_number'] == group]
+        return self.data[self.data["group_number"] == group]
 
     def members(self, group, /):
         """Identifiers of groups members.
-        
+
         Parameters
         ----------
         group: int, str
@@ -135,8 +153,10 @@ class TeamBuilder:
 
     @functools.cached_property
     def diversity(self):
-          return dict(**{i: self.data[i].sum() / len(self.data) for i in self.categorical},
-                      **{i: self.data[i].mean() for i in self.continuous})
+        return dict(
+            **{i: self.data[i].sum() / len(self.data) for i in self.categorical},
+            **{i: self.data[i].mean() for i in self.continuous},
+        )
 
     def group_cost(self, group, /):
         """Cost value of a single group.
@@ -151,24 +171,31 @@ class TeamBuilder:
         float
             Cost
 
-        """            
-        c = sum(len(set(i) & set(self.members(group)))**2 for i in self.separate)
-        c += sum(-len(set(i) & set(self.members(group)))**2 for i in self.together)
-        
+        """
+        c = sum(len(set(i) & set(self.members(group))) ** 2 for i in self.separate)
+        c += sum(-len(set(i) & set(self.members(group))) ** 2 for i in self.together)
+
         for k, v in self.enforce_group.items():
             if k in self[group][self.identifier].to_list():
                 if v != len(self[group]):
                     c += 1e6 * len(self[group])
 
-        grp = dict(**{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
-                   **{i: self[group][i].mean() for i in self.continuous})
+        grp = dict(
+            **{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
+            **{i: self[group][i].mean() for i in self.continuous},
+        )
 
         c += sum([abs(grp[i] - self.diversity[i]) for i in self.categorical])
-        c += sum([1 / self.data[i].max() * abs(grp[i] - self.diversity[i]) for i in self.continuous])
+        c += sum(
+            [
+                1 / self.data[i].max() * abs(grp[i] - self.diversity[i])
+                for i in self.continuous
+            ]
+        )
 
         return c
 
-    @property  
+    @property
     def cost(self):
         """Total cost across all groups.
 
@@ -191,27 +218,33 @@ class TeamBuilder:
 
         # Select two people from different groups.
         while True:
-            a = random.randint(0, n-1)
-            b = random.randint(0, n-1)
+            a = random.randint(0, n - 1)
+            b = random.randint(0, n - 1)
 
             # groups to which a and b belong to
-            ga = self.data.iloc[a]['group_number']
-            gb = self.data.iloc[b]['group_number']
-            
+            ga = self.data.iloc[a]["group_number"]
+            gb = self.data.iloc[b]["group_number"]
+
             if ga != gb:
                 break
-            
+
         # cost before the swap
         c_init = self.group_cost(ga) + self.group_cost(gb)
 
         # Swap.
-        self.data.at[a, 'group_number'], self.data.at[b, 'group_number'] = gb, ga
-        self.data.at[a, 'group_name'], self.data.at[b, 'group_name'] = self.group_names[gb], self.group_names[ga]
-        
+        self.data.at[a, "group_number"], self.data.at[b, "group_number"] = gb, ga
+        self.data.at[a, "group_name"], self.data.at[b, "group_name"] = (
+            self.group_names[gb],
+            self.group_names[ga],
+        )
+
         # Go back to original groups if cost does not go down.
         if self.group_cost(ga) + self.group_cost(gb) > c_init:
-            self.data.at[a, 'group_number'], self.data.at[b, 'group_number'] = ga, gb
-            self.data.at[a, 'group_name'], self.data.at[b, 'group_name'] = self.group_names[ga], self.group_names[gb]
+            self.data.at[a, "group_number"], self.data.at[b, "group_number"] = ga, gb
+            self.data.at[a, "group_name"], self.data.at[b, "group_name"] = (
+                self.group_names[ga],
+                self.group_names[gb],
+            )
 
     def solve(self, n_iter, n_print=500):
         """Build teams.
@@ -228,7 +261,7 @@ class TeamBuilder:
             self.step()
 
             if i % n_print == 0 or i == n_iter - 1:
-                print(f'step = {i: 6d}: cost = {self.cost: .3f}')
+                print(f"step = {i: 6d}: cost = {self.cost: .3f}")
 
     def overview(self):
         """Groups overview.
@@ -239,22 +272,37 @@ class TeamBuilder:
             Groups overview.
 
         """
-        per_group = dict(**{i: self.data.groupby('group_name')[i].sum() for i in self.categorical},
-                         **{i: self.data.groupby('group_name')[i].mean() for i in self.continuous},
-                         n=self.data.groupby('group_name').count()[self.categorical[0]])
+        per_group = dict(
+            **{i: self.data.groupby("group_name")[i].sum() for i in self.categorical},
+            **{i: self.data.groupby("group_name")[i].mean() for i in self.continuous},
+            n=self.data.groupby("group_name").count()[self.categorical[0]],
+        )
 
-        totals = dict(**{i: self.data[i].count() for i in self.categorical},
-                      **{i: self.data[i].mean() for i in self.continuous},
-                      n=len(self.data))
+        totals = dict(
+            **{i: self.data[i].count() for i in self.categorical},
+            **{i: self.data[i].mean() for i in self.continuous},
+            n=len(self.data),
+        )
 
         # Explore how many separate rules are broken.
         split_stats = collections.defaultdict(list)
-        for group in self.data['group_name'].unique():
-            split_stats['group_name'].append(group)
-            split_stats['n_together'].append(max(len(set(separate).intersection(set(self.members(group))))
-                                                 for separate in self.separate))
+        for group in self.data["group_name"].unique():
+            split_stats["group_name"].append(group)
+            split_stats["n_together"].append(
+                max(
+                    len(set(separate).intersection(set(self.members(group))))
+                    for separate in self.separate
+                )
+            )
 
-        res = pd.concat([pd.DataFrame(per_group).join(pd.DataFrame(split_stats).set_index('group_name')), pd.DataFrame(totals, index=['total'])]).fillna(0)
-        res.loc['total', 'n_together'] = res['n_together'].max()
-        
+        res = pd.concat(
+            [
+                pd.DataFrame(per_group).join(
+                    pd.DataFrame(split_stats).set_index("group_name")
+                ),
+                pd.DataFrame(totals, index=["total"]),
+            ]
+        ).fillna(0)
+        res.loc["total", "n_together"] = res["n_together"].max()
+
         return res

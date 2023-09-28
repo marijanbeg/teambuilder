@@ -26,6 +26,10 @@ def synthetic(n, categorical=[], continuous=[]):
         Sythetic dataset
 
     """
-    return pd.DataFrame(dict(name=[f'person-{i}' for i in range(n)],
-                        **{c: [random.randint(0, 1) for _ in range(n)] for c in categorical},
-                        **{v: [random.randint(45, 90) for _ in range(n)] for v in continuous}))
+    return pd.DataFrame(
+        dict(
+            name=[f"person-{i}" for i in range(n)],
+            **{c: [random.randint(0, 1) for _ in range(n)] for c in categorical},
+            **{v: [random.randint(45, 90) for _ in range(n)] for v in continuous},
+        )
+    )
