@@ -179,7 +179,7 @@ class TeamBuilder:
 
         """
         c = sum(len(set(i) & set(self.members(group))) ** 2 for i in self.separate)
-        c += sum(-len(set(i) & set(self.members(group))) ** 2 for i in self.together)
+        c += sum(-(len(set(i) & set(self.members(group))) ** 2) for i in self.together)
 
         for k, v in self.enforce_group.items():
             if k in self[group][self.identifier].to_list():
