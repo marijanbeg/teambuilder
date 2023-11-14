@@ -6,16 +6,22 @@ import pandas as pd
 
 
 class TeamBuilder:
-    """TeamBuilder class for building diverse teams.
+    """Class for building diverse teams.
 
     Parameters
     ----------
     data: pandas.DataFrame
+    
         DataFrame with details about individuals.
+    
     identifier: str
-        Column name in ``data`` used to specify individuals.
+    
+            Column name in ``data`` used to specify individuals.
+   
     groups: Iterable(int)
+
         The number of people per group.
+    
     categorical: Iterable(str)
         Column names of variables that should be trated as categorical.
     continuous: Iterable(str)
