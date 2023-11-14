@@ -1,20 +1,16 @@
 [build-system]
-# 40.8.0 is the first version compatible with PEP 517
-requires = ["setuptools>=40.8.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "teambuilder"
-version = "0.0.1"
-description = "Python package for building teams and ensuring diversity."
-readme = "README.md"
-requires-python = ">=3.8"
-license = {file = "LICENSE"}
-
+version = "2023.11.0"
 authors = [
-    {name = "Marijan Beg"},
+  { name="Marijan Beg", email="m.beg@imperial.ac.uk" },
 ]
-
+description = "Python package for building diverse but equal teams."
+readme = "README.md"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Education",
@@ -22,35 +18,33 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
     "Natural Language :: English",
-    "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: Unix",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3 :: Only",
 ]
-
 dependencies = [
-    "pandas>=1.1",
-]
-
-[project.optional-dependencies]
-dev = [
-    "build",
-    "invoke",
-    "nbval",
-    "pre-commit",
-    "pytest-cov",
-    "twine"
+    "pandas >= 2.0.0",
 ]
 
 [project.urls]
-repository = "https://github.com/marijanbeg/teambuilder"
+"Homepage" = "https://github.com/marijanbeg/teambuilder"
 
-about = """
-- build teams and ensure diversity.
-"""
+[tool.ruff.lint]
+# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+# overlap with the use of a formatter, like Black, but we can override this behavior by
+# explicitly adding the rule.
+extend-select = [
+    "E501",  # line-too-long 
+    "UP",  # pyupgrade
+    # "D",  # pydocstyle
+    ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+ 
 [tool.coverage.run]
-omit = ["teambuilder/tests/*"]
+omit = [
+    "teambuilder/tests/*.py",
+    ]
 
-[tool.isort]
-skip_gitignore = true  # ignores files listed in .gitignore
+[tool.pytest.ini_options]
+addopts = "-v --doctest-modules --junitxml=junit/test-results.xml --cov=teambuilder --cov-report=xml --cov-report=html"
