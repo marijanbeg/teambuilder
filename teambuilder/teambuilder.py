@@ -25,7 +25,9 @@ class TeamBuilder:
     separate: Iterable(Iterable(str))
         Groups of individuals that should be kept separate.
     minimum_values: dict
-        Dictionary of required minimum members with the same categorical value in each group.
+
+        Dictionary of required minimum members with the same categorical value
+        in each group.
 
     """
 
@@ -62,32 +64,32 @@ class TeamBuilder:
             raise TypeError(f"Unsupported {type(categorical)=}.")
         if not all(i in data.columns for i in categorical):
             raise ValueError(
-                f"All elements in categorical must be column names in data."
+                "All elements in categorical must be column names in data."
             )
 
         if not isinstance(continuous, collections.abc.Iterable):
             raise TypeError(f"Unsupported {type(continuous)=}.")
         if not all(i in data.columns for i in continuous):
             raise ValueError(
-                f"All elements in continuous must be column names in data."
+                "All elements in continuous must be column names in data."
             )
 
         if not isinstance(together, collections.abc.Iterable):
             raise TypeError(f"Unsupported {type(together)=}.")
         if not all(data[identifier].to_list() for i in sum(together, start=[])):
             raise ValueError(
-                f"All elements in flattened together must be in data[identifier]."
+                "All elements in flattened together must be in data[identifier]."
             )
 
         if not isinstance(separate, collections.abc.Iterable):
             raise TypeError(f"Unsupported {type(separate)=}.")
         if not all(i in data[identifier].to_list() for i in sum(separate, start=[])):
             raise ValueError(
-                f"All elements in flattened separate must be in data[identifier]."
+                "All elements in flattened separate must be in data[identifier]."
             )
 
         if not all(k in data[identifier].to_list() for k in enforce_group):
-            raise ValueError(f"Keys must be valid identifiers.")
+            raise ValueError("Keys must be valid identifiers.")
 
         self.data = data
         self.identifier = identifier

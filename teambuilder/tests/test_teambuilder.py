@@ -1,4 +1,3 @@
-import random
 import pandas as pd
 from teambuilder import TeamBuilder
 
@@ -194,7 +193,10 @@ class TestTeamBuilder:
     #     assert tb.cost < cost_init
 
     #     # Are people together as expected?
-    #     group = tb.data[tb.data[self.identifier] == self.together[0][0]]['group_number'].values[0]
+
+    #     group = tb.data[tb.data[self.identifier] ==
+    #     self.together[0][0]]['group_number'].values[0]
+    
     #     assert all([i in tb.members(group) for i in self.together[0]])
 
     #     # Are people separate as expected?
