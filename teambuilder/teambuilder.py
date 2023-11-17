@@ -160,8 +160,8 @@ class TeamBuilder:
     def diversity(self):
         return dict(
             **{i: self.data[i].sum() / len(self.data) for i in self.categorical},
-            **{f'{i}_mean': self.data[i].mean() for i in self.continuous},
-            **{f'{i}_std': self.data[i].std() for i in self.continuous},
+            **{f"{i}_mean": self.data[i].mean() for i in self.continuous},
+            **{f"{i}_std": self.data[i].std() for i in self.continuous},
         )
 
     def group_cost(self, group, /):
@@ -191,21 +191,25 @@ class TeamBuilder:
         # Diversity in the group.
         grp = dict(
             **{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
-            **{f'{i}_mean': self[group][i].mean() for i in self.continuous},
-            **{f'{i}_std': self[group][i].mean() for i in self.continuous},
+            **{f"{i}_mean": self[group][i].mean() for i in self.continuous},
+            **{f"{i}_std": self[group][i].std() for i in self.continuous},
         )
 
         c += sum([abs(grp[i] - self.diversity[i]) for i in self.categorical])
 
-        # Means.
-        # We multiply by 1 / self.data[i].max() to ensure this cost does not overshadow the categorical ones.
-        c += sum(1 / self.data[i].max() * abs(grp[f'{i}_mean'] - self.diversity[f'{i}_mean']) for i in self.continuous)
+        # Means. We multiply by 1 / self.data[i].mean() to ensure this cost does not
+        # overshadow the categorical ones.
+        c += sum(
+            1
+            / self.data[i].mean()
+            * abs(grp[f"{i}_mean"] - self.diversity[f"{i}_mean"])
+            for i in self.continuous
+        )
 
         # Standard deviations.
         c += sum(
-            [
-                1 / self.data[i].max() * abs(grp[f'{i}_std'] - self.diversity[f'{i}_std']) for i in self.continuous
-            ]
+            1 / self.data[i].mean() * abs(grp[f"{i}_std"] - self.diversity[f"{i}_std"])
+            for i in self.continuous
         )
 
         c += sum(
@@ -296,15 +300,21 @@ class TeamBuilder:
         """
         per_group = dict(
             **{i: self.data.groupby("group_name")[i].sum() for i in self.categorical},
-            **{f'{i}_mean': self.data.groupby("group_name")[i].mean() for i in self.continuous},
-            **{f'{i}_std': self.data.groupby("group_name")[i].std() for i in self.continuous},
+            **{
+                f"{i}_mean": self.data.groupby("group_name")[i].mean()
+                for i in self.continuous
+            },
+            **{
+                f"{i}_std": self.data.groupby("group_name")[i].std()
+                for i in self.continuous
+            },
             n=self.data.groupby("group_name").count()[self.categorical[0]],
         )
 
         totals = dict(
             **{i: self.data[i].count() for i in self.categorical},
-            **{f'{i}_mean': self.data[i].mean() for i in self.continuous},
-            **{f'{i}_std': self.data[i].std() for i in self.continuous},
+            **{f"{i}_mean": self.data[i].mean() for i in self.continuous},
+            **{f"{i}_std": self.data[i].std() for i in self.continuous},
             n=len(self.data),
         )
 
