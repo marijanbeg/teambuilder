@@ -1,7 +1,8 @@
-import random
-import functools
 import collections
 import collections.abc
+import functools
+import random
+
 import pandas as pd
 
 
@@ -11,17 +12,17 @@ class TeamBuilder:
     Parameters
     ----------
     data: pandas.DataFrame
-    
+
         DataFrame with details about individuals.
-    
+
     identifier: str
-    
+
             Column name in ``data`` used to specify individuals.
-   
+
     groups: Iterable(int)
 
         The number of people per group.
-    
+
     categorical: Iterable(str)
         Column names of variables that should be trated as categorical.
     continuous: Iterable(str)
@@ -51,24 +52,16 @@ class TeamBuilder:
         minimum_values={},
         maximum_values={},
     ):
-        # Input checks
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError(f"Unsupported {type(data)=}.")
-
         if identifier not in data.columns:
             raise ValueError(f"{identifier=} is not a column name in data.")
 
-        if not isinstance(groups, collections.abc.Iterable):
-            raise TypeError(f"Unsupported {type(groups)=}.")
         if sum(groups) != len(data):
             raise ValueError(f"{sum(groups)=} is not equal to {len(data)=}.")
 
         if len(group_names) != len(groups):
             raise ValueError(f"{len(group_names)=} is not equal to {len(groups)=}.")
 
-        if not isinstance(categorical, collections.abc.Iterable):
-            raise TypeError(f"Unsupported {type(categorical)=}.")
-        if not all(i in data.columns for i in categorical):
+        if not all(col in data.columns for col in categorical):
             raise ValueError(
                 "All elements in categorical must be column names in data."
             )
@@ -76,9 +69,7 @@ class TeamBuilder:
         if not isinstance(continuous, collections.abc.Iterable):
             raise TypeError(f"Unsupported {type(continuous)=}.")
         if not all(i in data.columns for i in continuous):
-            raise ValueError(
-                "All elements in continuous must be column names in data."
-            )
+            raise ValueError("All elements in continuous must be column names in data.")
 
         if not isinstance(together, collections.abc.Iterable):
             raise TypeError(f"Unsupported {type(together)=}.")
@@ -169,7 +160,8 @@ class TeamBuilder:
     def diversity(self):
         return dict(
             **{i: self.data[i].sum() / len(self.data) for i in self.categorical},
-            **{i: self.data[i].mean() for i in self.continuous},
+            **{f'{i}_mean': self.data[i].mean() for i in self.continuous},
+            **{f'{i}_std': self.data[i].std() for i in self.continuous},
         )
 
     def group_cost(self, group, /):
@@ -186,24 +178,33 @@ class TeamBuilder:
             Cost
 
         """
+        # Keeping people together or separate.
         c = sum(len(set(i) & set(self.members(group))) ** 2 for i in self.separate)
         c += sum(-(len(set(i) & set(self.members(group))) ** 2) for i in self.together)
 
+        # Enforcing group membership.
         for k, v in self.enforce_group.items():
             if k in self[group][self.identifier].to_list():
                 if v != len(self[group]):
                     c += 1e4 * len(self[group])
 
+        # Diversity in the group.
         grp = dict(
             **{i: self[group][i].sum() / len(self[group]) for i in self.categorical},
-            **{i: self[group][i].mean() for i in self.continuous},
+            **{f'{i}_mean': self[group][i].mean() for i in self.continuous},
+            **{f'{i}_std': self[group][i].mean() for i in self.continuous},
         )
 
         c += sum([abs(grp[i] - self.diversity[i]) for i in self.categorical])
+
+        # Means.
+        # We multiply by 1 / self.data[i].max() to ensure this cost does not overshadow the categorical ones.
+        c += sum(1 / self.data[i].max() * abs(grp[f'{i}_mean'] - self.diversity[f'{i}_mean']) for i in self.continuous)
+
+        # Standard deviations.
         c += sum(
             [
-                1 / self.data[i].max() * abs(grp[i] - self.diversity[i])
-                for i in self.continuous
+                1 / self.data[i].max() * abs(grp[f'{i}_std'] - self.diversity[f'{i}_std']) for i in self.continuous
             ]
         )
 
@@ -295,13 +296,15 @@ class TeamBuilder:
         """
         per_group = dict(
             **{i: self.data.groupby("group_name")[i].sum() for i in self.categorical},
-            **{i: self.data.groupby("group_name")[i].mean() for i in self.continuous},
+            **{f'{i}_mean': self.data.groupby("group_name")[i].mean() for i in self.continuous},
+            **{f'{i}_std': self.data.groupby("group_name")[i].std() for i in self.continuous},
             n=self.data.groupby("group_name").count()[self.categorical[0]],
         )
 
         totals = dict(
             **{i: self.data[i].count() for i in self.categorical},
-            **{i: self.data[i].mean() for i in self.continuous},
+            **{f'{i}_mean': self.data[i].mean() for i in self.continuous},
+            **{f'{i}_std': self.data[i].std() for i in self.continuous},
             n=len(self.data),
         )
 

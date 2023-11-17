@@ -1,3 +1,3 @@
 # teambuilder
 
-Python package for building diverse bu equal teams.
+Python package for building diverse but equal teams.
