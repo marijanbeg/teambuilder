@@ -80,10 +80,6 @@ class TeamBuilder:
 
         if not isinstance(separate, collections.abc.Iterable):
             raise TypeError(f"Unsupported {type(separate)=}.")
-        if not all(i in data[identifier].to_list() for i in sum(separate, start=[])):
-            raise ValueError(
-                "All elements in flattened separate must be in data[identifier]."
-            )
 
         if not all(k in data[identifier].to_list() for k in enforce_group):
             raise ValueError("Keys must be valid identifiers.")
